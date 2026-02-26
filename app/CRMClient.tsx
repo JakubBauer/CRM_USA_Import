@@ -928,7 +928,7 @@ export default function CRMClient() {
           <div className="border-t border-slate-200 p-4 space-y-3">
             <div>
               <Label>Imię / Nazwa</Label>
-              <Input
+              <input
                 ref={nameRef as any}
                 value={form.name}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
