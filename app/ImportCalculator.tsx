@@ -1,10 +1,12 @@
 "use client";
+"use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-export default function ImportCalculatorPage({ onLogout }: { onLogout?: () => void }) {
-  return <MainApp onLogout={onLogout ?? (() => {})} />;
+export default function ImportCalculator({ onLogout }: { onLogout: () => void }) {
+  return <MainApp onLogout={onLogout} />;
 }
-
+function MainApp({ onLogout }: { onLogout: () => void }) {
+  
 // ================= PORTY USA =================
 const PORTS = {
   NJ: { name: "Port Newark / NJ", lat: 40.6887, lon: -74.1482, ocean: 900 },
