@@ -13,7 +13,6 @@ type PortKey = keyof typeof PORTS;
 type AuctionHouse = "copart" | "iaai" | "manheim";
 type BuyerType = "private" | "company";
 type VehicleSize = "sedan" | "suv" | "bigsuv" | "oversize";
-
 type ExciseRate = 0.015 | 0.031 | 0.093 | 0.186;
 
 // ================= MNOŻNIKI WIELKOŚCI AUTA =================
@@ -24,7 +23,6 @@ const SIZE_MULTIPLIERS: Record<VehicleSize, number> = {
   oversize: 2,
 };
 
-// Mnożnik transportu lądowego (różny od morskiego)
 const INLAND_SIZE_MULTIPLIERS: Record<VehicleSize, number> = {
   sedan: 1,
   suv: 1.2,
@@ -32,7 +30,7 @@ const INLAND_SIZE_MULTIPLIERS: Record<VehicleSize, number> = {
   oversize: 1.8,
 };
 
-// ================= PLACE (COPART / IAAI) =================
+// ================= PLACE (COPART / IAAI / MANHEIM) =================
 type Yard = {
   provider: AuctionHouse;
   state: string;
@@ -41,7 +39,7 @@ type Yard = {
   zip: string;
 };
 
-// (u Ciebie pusta lista — wkleisz sam)
+// ✅ WKLEJ LISTĘ PLACÓW TUTAJ (masz ją już wklejoną — zostaw jak jest)
 const YARDS_USA: Yard[] = [
   // ===== COPART (USA) — z Twojej listy =====
   { provider: "copart", state: "AL", city: "BIRMINGHAM", label: "Standard", zip: "35023" },
@@ -627,13 +625,13 @@ const YARDS_USA: Yard[] = [
 
   // ===== END IAAI =====
 ];
+
 function isZipInAnyYard(zip: string) {
   const z = (zip || "").trim().slice(0, 5);
   if (z.length !== 5) return false;
   return YARDS_USA.some((y) => y.zip === z);
 }
-// NOTE: Nie używamy \p{...} (Unicode Property Escapes), bo w części środowisk (np. pewne bundlery/wykonania)
-// może to rzucać błędem typu "Invalid regular expression".
+
 function normalize(s: string) {
   return s
     .toUpperCase()
@@ -651,12 +649,6 @@ function yardDisplay(y: Yard) {
 function searchYards(query: string, provider: AuctionHouse, limit = 12) {
   const q = normalize(query);
   if (!q) return [] as Yard[];
-  function isZipInAnyYard(zip: string) {
-  const z = (zip || "").trim().slice(0, 5);
-  if (z.length !== 5) return false;
-  return YARDS_USA.some((y) => y.zip === z);
-}
-
 
   const byProvider = YARDS_USA.filter((y) => y.provider === provider);
   const starts: Yard[] = [];
@@ -684,11 +676,9 @@ const AUCTION_MIN_FEE = 580;
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
-
 function clamp01(x: number) {
   return Math.min(1, Math.max(0, x));
 }
-
 function calcAuctionRate(priceUSD: number) {
   const p = priceUSD;
   if (p <= 1000) return 0;
@@ -697,34 +687,21 @@ function calcAuctionRate(priceUSD: number) {
   if (p <= 4000) return 0.245;
   if (p <= 5000) return 0.195;
 
-  if (p <= 10000) {
-    const t = clamp01((p - 5000) / (10000 - 5000));
-    return lerp(0.195, 0.127, t);
-  }
-  if (p <= 15000) {
-    const t = clamp01((p - 10000) / (15000 - 10000));
-    return lerp(0.127, 0.107, t);
-  }
-  if (p <= 20000) {
-    const t = clamp01((p - 15000) / (20000 - 15000));
-    return lerp(0.107, 0.088, t);
-  }
-  if (p <= 40000) {
-    const t = clamp01((p - 20000) / (40000 - 20000));
-    return lerp(0.088, 0.08, t);
-  }
+  if (p <= 10000) return lerp(0.195, 0.127, clamp01((p - 5000) / (10000 - 5000)));
+  if (p <= 15000) return lerp(0.127, 0.107, clamp01((p - 10000) / (15000 - 10000)));
+  if (p <= 20000) return lerp(0.107, 0.088, clamp01((p - 15000) / (20000 - 15000)));
+  if (p <= 40000) return lerp(0.088, 0.08, clamp01((p - 20000) / (40000 - 20000)));
   return 0.08;
 }
-
 function calcAuctionFee(priceUSD: number) {
   if (priceUSD <= 1000) return AUCTION_MIN_FEE + 120;
   const rate = calcAuctionRate(priceUSD);
   return Math.max(priceUSD * rate, AUCTION_MIN_FEE) + 120;
 }
 
-const INLAND_RATE = 2.3; // 2,3$ za milę
-const INLAND_MIN = 400; // minimum 400$
-const INLAND_MAX = 2000; // maksimum 2000$
+const INLAND_RATE = 2.3;
+const INLAND_MIN = 400;
+const INLAND_MAX = 2000;
 
 const INSURANCE_RATE = 0.02;
 const INSURANCE_MIN = 400;
@@ -735,10 +712,7 @@ const COMPANY_COMMISSION_PLN = 3300;
 
 function n2(x: number) {
   const v = Number.isFinite(x) ? x : 0;
-  return v.toLocaleString("pl-PL", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  return v.toLocaleString("pl-PL", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function parseNum(v: unknown) {
@@ -795,19 +769,15 @@ function usdToEur(usd: number, usdPln: number, eurPln: number) {
   return (usd * usdPln) / eurPln;
 }
 
-// ================= ROZBICIE "DODATKOWE WYDATKI" (WERSJA KLIENTA) =================
-// 1) Suma udziałów musi dawać 1.00
-// 2) Część kwoty "wchłaniamy" w: Cena z prowizją, Transport lądowy, Transport morski
 const CLIENT_EXTRA_SPLIT = {
-  absorbedIntoAuctionBundle: 0.2, // idzie do "Cena z prowizją domu aukcyjnego"
-  absorbedIntoInland: 0.2, // idzie do "Transport lądowy"
-  absorbedIntoOcean: 0.2, // idzie do "Transport morski"
-
-  brokerFee: 0.15, // Opłata brokerska
-  safeLoading: 0.1, // Bezpieczny załadunek
-  unloading: 0.1, // Bezpieczny rozładunek
-  securingMaterials: 0.1, // Materiały zabezpieczające
-  usaService: 0.15, // Obsługa USA
+  absorbedIntoAuctionBundle: 0.2,
+  absorbedIntoInland: 0.2,
+  absorbedIntoOcean: 0.2,
+  brokerFee: 0.15,
+  safeLoading: 0.1,
+  unloading: 0.1,
+  securingMaterials: 0.1,
+  usaService: 0.15,
 } as const;
 
 function round2(x: number) {
@@ -816,8 +786,6 @@ function round2(x: number) {
 
 function splitExtraUSD(extraUSD: number) {
   const e = Math.max(0, extraUSD);
-
-  // surowe
   const raw = {
     absorbedAuction: e * CLIENT_EXTRA_SPLIT.absorbedIntoAuctionBundle,
     absorbedInland: e * CLIENT_EXTRA_SPLIT.absorbedIntoInland,
@@ -829,7 +797,6 @@ function splitExtraUSD(extraUSD: number) {
     usaService: e * CLIENT_EXTRA_SPLIT.usaService,
   };
 
-  // zaokrąglamy do 0.01 i pilnujemy, żeby suma była IDEALNIE równa extraUSD
   const keys = Object.keys(raw) as (keyof typeof raw)[];
   const out: Record<keyof typeof raw, number> = {} as any;
 
@@ -839,7 +806,6 @@ function splitExtraUSD(extraUSD: number) {
     sum += out[k];
   }
 
-  // korekta różnicy na ostatniej pozycji (żeby nie pływało przez zaokrąglenia)
   const diff = round2(e - sum);
   const lastKey = keys[keys.length - 1];
   out[lastKey] = round2(out[lastKey] + diff);
@@ -847,8 +813,8 @@ function splitExtraUSD(extraUSD: number) {
   return out;
 }
 
-
-function MainApp({ onLogout }: { onLogout: () => void }) {
+// ✅ TO MUSI BYĆ DEFAULT EXPORT (żeby import w CRM działał)
+export default function ImportCalculator({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<"calculator" | "client">("calculator");
 
   const [buyerType, setBuyerType] = useState<BuyerType>("private");
@@ -950,13 +916,12 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
     const sizeOceanMult = SIZE_MULTIPLIERS[vehicleSize];
     const sizeInlandMult = INLAND_SIZE_MULTIPLIERS[vehicleSize];
 
-   const zipKnown = isZipInAnyYard(zip);
-const inlandMinDynamic = zipKnown ? INLAND_MIN : 1000;
+    const zipKnown = isZipInAnyYard(zip);
+    const inlandMinDynamic = zipKnown ? INLAND_MIN : 1000;
 
-const baseInland = zipCoord ? bestMiles * INLAND_RATE : inlandMinDynamic;
-const inlandPreClamp = Math.max(baseInland, inlandMinDynamic) * sizeInlandMult;
-const inland = Math.min(inlandPreClamp, INLAND_MAX);
-
+    const baseInland = zipCoord ? bestMiles * INLAND_RATE : inlandMinDynamic;
+    const inlandPreClamp = Math.max(baseInland, inlandMinDynamic) * sizeInlandMult;
+    const inland = Math.min(inlandPreClamp, INLAND_MAX);
 
     const oceanPreClamp = port.ocean * sizeOceanMult;
     const ocean = Math.min(oceanPreClamp, 2750);
@@ -1008,7 +973,6 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
       iaai: 0.15,
       manheim: 0.3,
     };
-
     const penaltyRate = penaltyRateMap[auctionHouse];
 
     const requiredDepositUSD = Math.max(0, priceUSD * penaltyRate);
@@ -1017,16 +981,13 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
 
     const depositPLN = depositMinPLN;
     const depositUSD = usdPlnSafe > 0 ? depositPLN / usdPlnSafe : 0;
-
     const maxBidUSD = penaltyRate > 0 ? depositUSD / penaltyRate : 0;
 
-    // ====== rozbicie extra (klient) ======
     const extraBreak = splitExtraUSD(extraUSD);
     const displayAuctionBundleUSD = priceUSD + auctionFee + extraBreak.absorbedAuction;
     const displayInlandUSD = inland + extraBreak.absorbedInland;
     const displayOceanUSD = ocean + extraBreak.absorbedOcean;
 
-    // kontrolnie: suma musi zostać taka sama
     const clientUsaSumUSD =
       displayAuctionBundleUSD +
       displayInlandUSD +
@@ -1041,14 +1002,12 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
     return {
       portName: port.name,
 
-      // bazowe (kalkulator)
       auctionFee,
       inland,
       ocean,
       insurance,
       usaTotalUSD,
 
-      // klient (rozbicie)
       extraUSD,
       extraBreak,
       displayAuctionBundleUSD,
@@ -1056,15 +1015,16 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
       displayOceanUSD,
       clientUsaSumUSD,
 
-      // reszta bez zmian
       dutyEUR,
       vatEUR,
       rotterdamTotalEUR,
       totalPLN,
+
       exciseRate,
       exciseGross,
       exciseVatPl,
       exciseAmount,
+
       depositUSD,
       penaltyRate,
       maxBidUSD,
@@ -1083,6 +1043,7 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
     exciseRate,
     exciseGrossPln,
     auctionHouse,
+    zip,
   ]);
 
   return (
@@ -1106,7 +1067,6 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
             </div>
           </div>
 
-          {/* ====== TABS (2 zakładki na górze) ====== */}
           <div className="flex gap-2">
             <button
               type="button"
@@ -1182,9 +1142,7 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
                 setSelectedYard(null);
 
                 const maybeZip = v.replace(/[^0-9]/g, "").slice(0, 5);
-                if (maybeZip.length === 5) {
-                  setZip(maybeZip);
-                }
+                if (maybeZip.length === 5) setZip(maybeZip);
 
                 setYardOpen(true);
               }}
@@ -1256,7 +1214,6 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
             <span className="text-sm">Ubezpieczenie transportu</span>
           </div>
 
-          {/* ====== RÓŻNICA MIĘDZY ZAKŁADKAMI: INPUT "Dodatkowe wydatki" tylko w Kalkulatorze ====== */}
           {tab === "calculator" && (
             <div>
               <label className="text-sm font-semibold text-gray-600">Dodatkowe wydatki (USD)</label>
@@ -1307,13 +1264,11 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
               </div>
 
               <div className="text-base font-semibold">Do wpłaty: {n2(calc.requiredDepositPLN)} PLN</div>
-
               <div className="text-xs text-gray-500">Minimalny depozyt: 3300 PLN</div>
             </div>
           </div>
         </div>
 
-        {/* ====== PANEL PO PRAWEJ (jak na screenie) ====== */}
         <div className="bg-black text-white rounded-2xl shadow-xl p-8 space-y-6 sticky top-10 h-fit">
           <div>
             <div className="text-xs uppercase tracking-wider text-gray-400">Najbliższy port</div>
@@ -1323,7 +1278,6 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
           <div className="border-t border-gray-700 pt-4">
             <div className="text-xs uppercase text-gray-400">USA (USD)</div>
 
-            {/* ====== ZAKŁADKA: KALKULATOR ====== */}
             {tab === "calculator" && (
               <div className="space-y-1 text-sm">
                 <div>Cena z prowizją domu aukcyjnego: {n2(parseNum(vehiclePrice) + calc.auctionFee)}</div>
@@ -1335,7 +1289,6 @@ const inland = Math.min(inlandPreClamp, INLAND_MAX);
               </div>
             )}
 
-            {/* ====== ZAKŁADKA: ROZLICZENIE DLA KLIENTA ====== */}
             {tab === "client" && (
               <div className="space-y-1 text-sm">
                 <div>Cena z prowizją domu aukcyjnego: {n2(calc.displayAuctionBundleUSD)}</div>
