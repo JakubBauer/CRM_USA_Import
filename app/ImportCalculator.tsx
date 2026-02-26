@@ -1,8 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-type TabKey = "calculator" | "client";
-
 // ================= PORTY USA =================
 const PORTS = {
   NJ: { name: "Port Newark / NJ", lat: 40.6887, lon: -74.1482, ocean: 900 },
@@ -920,7 +918,7 @@ function splitExtraUSD(extraUSD: number) {
 
 
 function MainApp({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<TabKey>("calculator");
+  const [tab, setTab] = useState<"calculator" | "client">("calculator");
 
   const [buyerType, setBuyerType] = useState<BuyerType>("private");
   const [exciseRate, setExciseRate] = useState<ExciseRate>(0.031);
