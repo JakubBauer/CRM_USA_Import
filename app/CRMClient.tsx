@@ -1,7 +1,19 @@
+
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import ImportCalculator from "./ImportCalculator";
+import ImportCalculatorPage from "./ImportCalculator";
+
+
+// --- UI helpers (MUSZĄ być poza Page, inaczej focus spada) ---
+const Shell = ({ children }: { children: React.ReactNode }) => (
+  <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="mx-auto max-w-7xl px-4 py-5">{children}</div>
+  </div>
+);
+
+function Topbar({
+  title,
 
 
 // --- UI helpers (MUSZĄ być poza Page, inaczej focus spada) ---
@@ -882,7 +894,7 @@ export default function CRMClient() {
           }
         />
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(0,0,0,.06)]">
-          <ImportCalculator />
+          <ImportCalculatorPage />
         </div>
       </Shell>
     );
