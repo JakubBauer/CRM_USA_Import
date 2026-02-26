@@ -1,5 +1,7 @@
 "use client";
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
+
 export default function ImportCalculator(props: { onLogout?: () => void }) {
   return <MainApp onLogout={props.onLogout ?? (() => {})} />;
 }
@@ -43,6 +45,8 @@ type Yard = {
   zip: string;
 };
 
+// ✅ Możesz tu wkleić swoją pełną listę.
+// Ta mała lista jest tylko po to, żeby plik działał “od razu”.
 const YARDS_USA: Yard[] = [
   // ===== COPART (USA) — z Twojej listy =====
   { provider: "copart", state: "AL", city: "BIRMINGHAM", label: "Standard", zip: "35023" },
@@ -822,8 +826,11 @@ function splitExtraUSD(extraUSD: number) {
   return out;
 }
 
-
+// ================= MAIN APP (TU MUSZĄ BYĆ WSZYSTKIE HOOKI) =================
 function MainApp({ onLogout }: { onLogout: () => void }) {
+  // ✅ brakowało tego u Ciebie (tab + setTab)
+  const [tab, setTab] = useState<"calculator" | "client">("calculator");
+
   const [buyerType, setBuyerType] = useState<BuyerType>("private");
   const [exciseRate, setExciseRate] = useState<ExciseRate>(0.031);
   const [exciseGrossPln, setExciseGrossPln] = useState("0");
@@ -923,6 +930,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
     const sizeOceanMult = SIZE_MULTIPLIERS[vehicleSize];
     const sizeInlandMult = INLAND_SIZE_MULTIPLIERS[vehicleSize];
 
+    // ✅ poprawka: ZIP nieznany => min 1000
     const zipKnown = isZipInAnyYard(zip);
     const inlandMinDynamic = zipKnown ? INLAND_MIN : INLAND_MIN_UNKNOWN;
 
@@ -974,6 +982,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
     const exciseVatPl = exciseGross > 0 ? exciseGross - exciseNet : 0;
     const exciseAmount = Math.max(0, exciseNet * exciseRate);
 
+    // depozyt i max licytacja
     const depositMinPLN = 3300;
 
     const penaltyRateMap: Record<AuctionHouse, number> = {
@@ -990,9 +999,9 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
 
     const depositPLN = depositMinPLN;
     const depositUSD = usdPlnSafe > 0 ? depositPLN / usdPlnSafe : 0;
-
     const maxBidUSD = penaltyRate > 0 ? depositUSD / penaltyRate : 0;
 
+    // ✅ rozbicie extra dla klienta
     const extraBreak = splitExtraUSD(extraUSD);
     const displayAuctionBundleUSD = priceUSD + auctionFee + extraBreak.absorbedAuction;
     const displayInlandUSD = inland + extraBreak.absorbedInland;
@@ -1204,11 +1213,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <label className="text-sm font-semibold text-gray-600">ZIP</label>
-              <input
-                className="mt-1 w-full rounded-xl border p-2 focus:ring-2 focus:ring-black"
-                value={zip}
-                onChange={(e) => setZip(e.target.value)}
-              />
+              <input className="mt-1 w-full rounded-xl border p-2 focus:ring-2 focus:ring-black" value={zip} onChange={(e) => setZip(e.target.value)} />
             </div>
             <div>
               <label className="text-sm font-semibold text-gray-600">Cena zakupu (USD)</label>
