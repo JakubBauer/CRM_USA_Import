@@ -824,9 +824,6 @@ function splitExtraUSD(extraUSD: number) {
 
 
 
-function MainApp({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<"calculator" | "client">("calculator");
-
   const [buyerType, setBuyerType] = useState<BuyerType>("private");
   const [exciseRate, setExciseRate] = useState<ExciseRate>(0.031);
   const [exciseGrossPln, setExciseGrossPln] = useState("0");
