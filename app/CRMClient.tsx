@@ -3,19 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ImportCalculatorPage from "./ImportCalculator";
 
-
-// --- UI helpers (MUSZĄ być poza Page, inaczej focus spada) ---
-const Shell = ({ children }: { children: React.ReactNode }) => (
-  <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-    <div className="mx-auto max-w-7xl px-4 py-5">{children}</div>
-  </div>
-);
-
-function Topbar({
-  title,
-
-
-// --- UI helpers (MUSZĄ być poza Page, inaczej focus spada) ---
+// --- UI helpers (MUSZĄ być poza CRMClient, inaczej parser/closure robi burdel) ---
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
     <div className="mx-auto max-w-7xl px-4 py-5">{children}</div>
@@ -95,37 +83,39 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div className="mb-1 text-xs font-medium text-slate-600">{children}</div>
 );
 
-const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  function Input(props, ref) {
-    const { className = "", ...rest } = props;
-    return (
-      <input
-        ref={ref}
-        {...rest}
-        className={
-          "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 " +
-          className
-        }
-      />
-    );
-  }
-);
+const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input(
+  props,
+  ref
+) {
+  const { className = "", ...rest } = props;
+  return (
+    <input
+      ref={ref}
+      {...rest}
+      className={
+        "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 " +
+        className
+      }
+    />
+  );
+});
 
-const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(
-  function Select(props, ref) {
-    const { className = "", ...rest } = props;
-    return (
-      <select
-        ref={ref}
-        {...rest}
-        className={
-          "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 " +
-          className
-        }
-      />
-    );
-  }
-);
+const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(function Select(
+  props,
+  ref
+) {
+  const { className = "", ...rest } = props;
+  return (
+    <select
+      ref={ref}
+      {...rest}
+      className={
+        "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 " +
+        className
+      }
+    />
+  );
+});
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
   function Textarea(props, ref) {
@@ -142,6 +132,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttribu
     );
   }
 );
+
+// --- Types / helpers ---
 type Role = "ADMIN" | "SALES";
 type UserRow = { id: string; name: string; role: Role; phone: string };
 type User = { id: string; name: string; role: Role };
@@ -223,7 +215,6 @@ function normalizePhone(p?: string) {
   return (p ?? "").replace(/\D/g, "");
 }
 
-/** dedupe po telefonie (cyfry). Jeśli brak telefonu -> name|role. */
 function dedupeAndSortUsers(list: UserRow[]) {
   const map = new Map<string, UserRow>();
   for (const u of list) {
@@ -341,24 +332,18 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(0,0,0,.06)] p-5">
         <div className="mb-4">
           <h2 className="text-xl font-semibold tracking-tight">CRM Login</h2>
-          <p className="mt-1 text-sm text-slate-500">Zaloguj się numerem telefonu i hasłem z tabeli users.</p>
+          <p className="mt-1 text-sm text-slate-500">Zaloguj się numerem telefonu i hasłem.</p>
         </div>
 
         <div className="space-y-3">
           <div>
-            <div className="mb-1 text-xs font-medium text-slate-600">Numer telefonu</div>
-            <input
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+48..."
-            />
+            <Label>Numer telefonu</Label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+48..." />
           </div>
 
           <div>
-            <div className="mb-1 text-xs font-medium text-slate-600">Hasło</div>
-            <input
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+            <Label>Hasło</Label>
+            <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -397,7 +382,6 @@ export default function CRMClient() {
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "Wszystkie">("Wszystkie");
   const [sort, setSort] = useState<"newest" | "oldest" | "name">("newest");
   const [followupView, setFollowupView] = useState<"all" | "today" | "overdue">("all");
-
   const [ownerFilter, setOwnerFilter] = useState<string>("Wszyscy");
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -422,23 +406,18 @@ export default function CRMClient() {
   useEffect(() => setAdminUnlockClosed(false), [editingId]);
   useEffect(() => {
     if (form.status !== "Wydane") setAdminUnlockClosed(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.status]);
 
   const nameRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
-    // fokus tylko gdy przechodzisz na "dodaj nowego" (editingId = null)
-    if (!editingId) {
-      requestAnimationFrame(() => {
-        nameRef.current?.focus();
-      });
-    }
+    if (!editingId) requestAnimationFrame(() => nameRef.current?.focus());
   }, [editingId]);
+
   const showChecklist = form.status === "Kupiony" || form.status === "Wydane";
   const isClosed = form.status === "Wydane";
   const canEditChecklist = !isClosed || (user?.role === "ADMIN" && adminUnlockClosed);
 
-  // kto zalogowany (tylko z API)
+  // whoami
   useEffect(() => {
     (async () => {
       try {
@@ -450,6 +429,7 @@ export default function CRMClient() {
     })();
   }, []);
 
+  // ustaw ownerId dla nowego leada
   useEffect(() => {
     if (!user) return;
     setForm((p) => ({ ...p, ownerId: p.ownerId || user.id }));
@@ -487,7 +467,7 @@ export default function CRMClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.role]);
 
-  // lista opiekunów z Supabase (API) i tylko stamtąd
+  // users (tylko ADMIN)
   useEffect(() => {
     if (!user) return;
 
@@ -498,13 +478,11 @@ export default function CRMClient() {
 
     fetch(`/api/users?role=${encodeURIComponent(user.role)}`, { cache: "no-store" })
       .then((r) => r.json())
-      .then((list) => {
-        const arr = Array.isArray(list) ? (list as UserRow[]) : [];
-        setUsers(dedupeAndSortUsers(arr));
-      })
+      .then((list) => setUsers(dedupeAndSortUsers(Array.isArray(list) ? (list as UserRow[]) : [])))
       .catch(() => setUsers([]));
   }, [user]);
 
+  // load do edycji
   useEffect(() => {
     if (!user) return;
     if (!editing) return;
@@ -564,7 +542,6 @@ export default function CRMClient() {
 
     const safeBudget = parseBudget();
     const year = parseYear();
-
     const finalOwnerId = user.role === "ADMIN" ? form.ownerId || user.id : user.id;
 
     setSaving(true);
@@ -782,103 +759,8 @@ export default function CRMClient() {
 
   // --- RENDER ---
   if (!user) {
-    return (
-      <Login
-        onLogin={(u) => {
-          setUser(u);
-        }}
-      />
-    );
+    return <Login onLogin={(u) => setUser(u)} />;
   }
-
-  const Shell = ({ children }: { children: React.ReactNode }) => (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      <div className="mx-auto max-w-7xl px-4 py-5">{children}</div>
-    </div>
-  );
-
-  const Topbar = ({ title, subtitle }: { title: string; subtitle: React.ReactNode }) => (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-        <div className="mt-1 text-sm text-slate-500">{subtitle}</div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-          <button
-            className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-              view === "crm" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
-            }`}
-            onClick={() => setView("crm")}
-            type="button"
-          >
-            CRM
-          </button>
-          <button
-            className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-              view === "calc" ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-50"
-            }`}
-            onClick={() => setView("calc")}
-            type="button"
-          >
-            Kalkulator
-          </button>
-        </div>
-
-        <button
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          onClick={reload}
-          disabled={loading || saving}
-          type="button"
-        >
-          Odśwież
-        </button>
-
-        <button
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          onClick={logout}
-          type="button"
-        >
-          Wyloguj
-        </button>
-      </div>
-    </div>
-  );
-
-  const Input = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
-    <input
-      {...props}
-      className={
-        "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 " +
-        (props.className ?? "")
-      }
-    />
-  );
-
-  const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
-    <select
-      {...props}
-      className={
-        "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 " +
-        (props.className ?? "")
-      }
-    />
-  );
-
-  const Textarea = (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => (
-    <textarea
-      {...props}
-      className={
-        "w-full min-h-[100px] resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 " +
-        (props.className ?? "")
-      }
-    />
-  );
-
-  const Label = ({ children }: { children: React.ReactNode }) => (
-    <div className="mb-1 text-xs font-medium text-slate-600">{children}</div>
-  );
 
   if (view === "calc") {
     return (
@@ -891,6 +773,12 @@ export default function CRMClient() {
               <span className="text-slate-400">({user.role})</span>
             </>
           }
+          view={view}
+          setView={setView}
+          reload={reload}
+          logout={logout}
+          loading={loading}
+          saving={saving}
         />
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(0,0,0,.06)]">
           <ImportCalculatorPage />
@@ -909,6 +797,12 @@ export default function CRMClient() {
             <span className="text-slate-400">({user.role})</span>
           </>
         }
+        view={view}
+        setView={setView}
+        reload={reload}
+        logout={logout}
+        loading={loading}
+        saving={saving}
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -941,8 +835,8 @@ export default function CRMClient() {
           <div className="border-t border-slate-200 p-4 space-y-3">
             <div>
               <Label>Imię / Nazwa</Label>
-              <input
-                ref={nameRef as any}
+              <Input
+                ref={nameRef}
                 value={form.name}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
               />
@@ -1004,7 +898,9 @@ export default function CRMClient() {
                 <Label>Rocznik</Label>
                 <Input
                   value={form.yearText}
-                  onChange={(e) => setForm((p) => ({ ...p, yearText: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) }))}
+                  onChange={(e) =>
+                    setForm((p) => ({ ...p, yearText: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) }))
+                  }
                   inputMode="numeric"
                   placeholder="2019"
                 />
@@ -1042,9 +938,7 @@ export default function CRMClient() {
                   <div>
                     <div className="text-sm font-semibold">Checklist (import / wydanie)</div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {form.status === "Kupiony"
-                        ? "Kupiony: checklistę można edytować."
-                        : "Wydane: checklist domyślnie zablokowany."}
+                      {form.status === "Kupiony" ? "Kupiony: checklistę można edytować." : "Wydane: checklist domyślnie zablokowany."}
                     </div>
                   </div>
 
@@ -1122,11 +1016,7 @@ export default function CRMClient() {
             </div>
 
             <div className="pt-1 text-xs text-slate-500">
-              {loading
-                ? "Ładowanie…"
-                : user.role === "ADMIN"
-                ? "ADMIN: widzisz wszystko."
-                : "SALES: widzisz tylko swoje leady (backend)."}
+              {loading ? "Ładowanie…" : user.role === "ADMIN" ? "ADMIN: widzisz wszystko." : "SALES: widzisz tylko swoje leady (backend)."}
             </div>
           </div>
         </div>
@@ -1172,9 +1062,7 @@ export default function CRMClient() {
                 </button>
                 <button
                   className={`rounded-lg px-3 py-2 text-xs font-semibold ${
-                    followupView === "overdue"
-                      ? "bg-red-600 text-white"
-                      : "text-slate-700 hover:bg-slate-50"
+                    followupView === "overdue" ? "bg-red-600 text-white" : "text-slate-700 hover:bg-slate-50"
                   }`}
                   onClick={() => setFollowupView("overdue")}
                   type="button"
@@ -1230,9 +1118,7 @@ export default function CRMClient() {
                       <tr
                         key={l.id}
                         onClick={() => setEditingId(l.id)}
-                        className={`cursor-pointer ${
-                          editingId === l.id ? "bg-blue-50" : "hover:bg-slate-50"
-                        }`}
+                        className={`cursor-pointer ${editingId === l.id ? "bg-blue-50" : "hover:bg-slate-50"}`}
                       >
                         <td className="border-b border-slate-100 px-4 py-3 align-top">
                           <div className="font-semibold text-slate-900">{l.name}</div>
@@ -1248,7 +1134,11 @@ export default function CRMClient() {
 
                         <td className="border-b border-slate-100 px-4 py-3 align-top">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeBg(l.status)}`}>
+                            <span
+                              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeBg(
+                                l.status
+                              )}`}
+                            >
                               {l.status}
                             </span>
                             <Select
@@ -1283,7 +1173,9 @@ export default function CRMClient() {
                           ) : (
                             <div className="text-xs text-slate-500">—</div>
                           )}
-                          {l.status === "Kupiony" && l.vin ? <div className="mt-1 text-xs text-slate-500">VIN: {l.vin}</div> : null}
+                          {l.status === "Kupiony" && l.vin ? (
+                            <div className="mt-1 text-xs text-slate-500">VIN: {l.vin}</div>
+                          ) : null}
                         </td>
 
                         <td className="border-b border-slate-100 px-4 py-3 align-top">
@@ -1360,7 +1252,8 @@ export default function CRMClient() {
             </div>
 
             <div className="p-4 text-xs text-slate-500">
-              Tip: leady pobierane są z <code className="rounded bg-slate-100 px-1 py-0.5">/api/leads?userId=...&role=...</code>.
+              Tip: leady pobierane są z{" "}
+              <code className="rounded bg-slate-100 px-1 py-0.5">/api/leads?userId=...&role=...</code>.
             </div>
           </div>
         </div>
