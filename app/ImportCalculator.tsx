@@ -1,5 +1,8 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+export default function ImportCalculator(props: { onLogout?: () => void }) {
+  return <MainApp onLogout={props.onLogout ?? (() => {})} />;
+}
 
 // ================= PORTY USA =================
 const PORTS = {
