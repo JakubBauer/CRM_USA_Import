@@ -817,8 +817,10 @@ function splitExtraUSD(extraUSD: number) {
 }
 
 // ✅ TO MUSI BYĆ DEFAULT EXPORT (żeby import w CRM działał)
-export default function ImportCalculator({ onLogout }: { onLogout: () => void }) {
+function MainApp({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<"calculator" | "client">("calculator");
+  ...
+}
 
   const [buyerType, setBuyerType] = useState<BuyerType>("private");
   const [exciseRate, setExciseRate] = useState<ExciseRate>(0.031);
