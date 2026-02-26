@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import ImportCalculator from "./ImportCalculator";
+import ImportCalculatorPage from "./ImportCalculator";
 // --- UI helpers (MUSZĄ być poza Page, inaczej focus spada) ---
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
