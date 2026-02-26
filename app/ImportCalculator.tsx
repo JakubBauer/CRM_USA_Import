@@ -822,10 +822,7 @@ function splitExtraUSD(extraUSD: number) {
   return out;
 }
 
-// ================= DEFAULT EXPORT (CRM importuje TO) =================
-function MainApp(props: { onLogout: () => void }) {
-  return <MainApp onLogout={onLogout ?? (() => {})} />;
-}
+
 
 function MainApp({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<"calculator" | "client">("calculator");
