@@ -1,12 +1,6 @@
 "use client";
-"use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-export default function ImportCalculator({ onLogout }: { onLogout: () => void }) {
-  return <MainApp onLogout={onLogout} />;
-}
-function MainApp({ onLogout }: { onLogout: () => void }) {
-  
 // ================= PORTY USA =================
 const PORTS = {
   NJ: { name: "Port Newark / NJ", lat: 40.6887, lon: -74.1482, ocean: 900 },
@@ -29,6 +23,7 @@ const SIZE_MULTIPLIERS: Record<VehicleSize, number> = {
   oversize: 2,
 };
 
+// Mnożnik transportu lądowego (różny od morskiego)
 const INLAND_SIZE_MULTIPLIERS: Record<VehicleSize, number> = {
   sedan: 1,
   suv: 1.2,
@@ -45,7 +40,6 @@ type Yard = {
   zip: string;
 };
 
-// ✅ WKLEJ LISTĘ PLACÓW TUTAJ (masz ją już wklejoną — zostaw jak jest)
 const YARDS_USA: Yard[] = [
   // ===== COPART (USA) — z Twojej listy =====
   { provider: "copart", state: "AL", city: "BIRMINGHAM", label: "Standard", zip: "35023" },
@@ -682,9 +676,11 @@ const AUCTION_MIN_FEE = 580;
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
+
 function clamp01(x: number) {
   return Math.min(1, Math.max(0, x));
 }
+
 function calcAuctionRate(priceUSD: number) {
   const p = priceUSD;
   if (p <= 1000) return 0;
@@ -693,20 +689,22 @@ function calcAuctionRate(priceUSD: number) {
   if (p <= 4000) return 0.245;
   if (p <= 5000) return 0.195;
 
-  if (p <= 10000) return lerp(0.195, 0.127, clamp01((p - 5000) / (10000 - 5000)));
-  if (p <= 15000) return lerp(0.127, 0.107, clamp01((p - 10000) / (15000 - 10000)));
-  if (p <= 20000) return lerp(0.107, 0.088, clamp01((p - 15000) / (20000 - 15000)));
-  if (p <= 40000) return lerp(0.088, 0.08, clamp01((p - 20000) / (40000 - 20000)));
+  if (p <= 10000) return lerp(0.195, 0.127, clamp01((p - 5000) / 5000));
+  if (p <= 15000) return lerp(0.127, 0.107, clamp01((p - 10000) / 5000));
+  if (p <= 20000) return lerp(0.107, 0.088, clamp01((p - 15000) / 5000));
+  if (p <= 40000) return lerp(0.088, 0.08, clamp01((p - 20000) / 20000));
   return 0.08;
 }
+
 function calcAuctionFee(priceUSD: number) {
   if (priceUSD <= 1000) return AUCTION_MIN_FEE + 120;
   const rate = calcAuctionRate(priceUSD);
   return Math.max(priceUSD * rate, AUCTION_MIN_FEE) + 120;
 }
 
-const INLAND_RATE = 2.3;
-const INLAND_MIN = 400;
+const INLAND_RATE = 2.3; // $/mile
+const INLAND_MIN = 400; // min jeśli ZIP znany
+const INLAND_MIN_UNKNOWN = 1000; // min jeśli ZIP nie pasuje do żadnego placu
 const INLAND_MAX = 2000;
 
 const INSURANCE_RATE = 0.02;
@@ -764,7 +762,7 @@ async function fetchNBPRate(code: string) {
   try {
     const res = await fetch(`https://api.nbp.pl/api/exchangerates/rates/A/${code}/?format=json`);
     const data = await res.json();
-    return data.rates[0].mid as number;
+    return data?.rates?.[0]?.mid as number;
   } catch {
     return null;
   }
@@ -775,6 +773,7 @@ function usdToEur(usd: number, usdPln: number, eurPln: number) {
   return (usd * usdPln) / eurPln;
 }
 
+// --- rozbicie extra (klient) ---
 const CLIENT_EXTRA_SPLIT = {
   absorbedIntoAuctionBundle: 0.2,
   absorbedIntoInland: 0.2,
@@ -792,6 +791,7 @@ function round2(x: number) {
 
 function splitExtraUSD(extraUSD: number) {
   const e = Math.max(0, extraUSD);
+
   const raw = {
     absorbedAuction: e * CLIENT_EXTRA_SPLIT.absorbedIntoAuctionBundle,
     absorbedInland: e * CLIENT_EXTRA_SPLIT.absorbedIntoInland,
@@ -819,11 +819,13 @@ function splitExtraUSD(extraUSD: number) {
   return out;
 }
 
-// ✅ TO MUSI BYĆ DEFAULT EXPORT (żeby import w CRM działał)
+// ================= DEFAULT EXPORT (CRM importuje TO) =================
+export default function ImportCalculator({ onLogout }: { onLogout?: () => void }) {
+  return <MainApp onLogout={onLogout ?? (() => {})} />;
+}
+
 function MainApp({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<"calculator" | "client">("calculator");
-  ...
-}
 
   const [buyerType, setBuyerType] = useState<BuyerType>("private");
   const [exciseRate, setExciseRate] = useState<ExciseRate>(0.031);
@@ -858,7 +860,6 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     let alive = true;
     const z = zip.trim();
-
     if (z.length < 3) {
       setZipCoord(null);
       return;
@@ -921,11 +922,12 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
     }
 
     const port = PORTS[bestPort];
+
     const sizeOceanMult = SIZE_MULTIPLIERS[vehicleSize];
     const sizeInlandMult = INLAND_SIZE_MULTIPLIERS[vehicleSize];
 
     const zipKnown = isZipInAnyYard(zip);
-    const inlandMinDynamic = zipKnown ? INLAND_MIN : 1000;
+    const inlandMinDynamic = zipKnown ? INLAND_MIN : INLAND_MIN_UNKNOWN;
 
     const baseInland = zipCoord ? bestMiles * INLAND_RATE : inlandMinDynamic;
     const inlandPreClamp = Math.max(baseInland, inlandMinDynamic) * sizeInlandMult;
@@ -933,6 +935,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
 
     const oceanPreClamp = port.ocean * sizeOceanMult;
     const ocean = Math.min(oceanPreClamp, 2750);
+
     const auctionFee = calcAuctionFee(priceUSD);
     const insurance = insuranceEnabled ? Math.max(priceUSD * INSURANCE_RATE, INSURANCE_MIN) : 0;
 
@@ -981,6 +984,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
       iaai: 0.15,
       manheim: 0.3,
     };
+
     const penaltyRate = penaltyRateMap[auctionHouse];
 
     const requiredDepositUSD = Math.max(0, priceUSD * penaltyRate);
@@ -989,6 +993,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
 
     const depositPLN = depositMinPLN;
     const depositUSD = usdPlnSafe > 0 ? depositPLN / usdPlnSafe : 0;
+
     const maxBidUSD = penaltyRate > 0 ? depositUSD / penaltyRate : 0;
 
     const extraBreak = splitExtraUSD(extraUSD);
@@ -1063,10 +1068,11 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
               type="button"
               onClick={onLogout}
               className="ml-auto text-xs rounded-lg border px-3 py-2 hover:bg-slate-50"
-              title="Wyloguj"
+              title="Wyloguj / wyjdź"
             >
-              Wyloguj
+              Wyjdź
             </button>
+
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Kalkulator Importu USA → Rotterdam → Polska</h1>
               <div className="text-sm text-gray-500 mt-1">
@@ -1265,12 +1271,10 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
 
           <div className="bg-white rounded-2xl shadow-xl p-6 border">
             <div className="text-sm font-semibold text-gray-700">Wymagany depozyt</div>
-
             <div className="mt-4 space-y-2 text-sm text-gray-800">
               <div>
                 Kara umowna ({(calc.penaltyRate * 100).toFixed(0)}%): {n2(calc.requiredDepositUSD)} USD
               </div>
-
               <div className="text-base font-semibold">Do wpłaty: {n2(calc.requiredDepositPLN)} PLN</div>
               <div className="text-xs text-gray-500">Minimalny depozyt: 3300 PLN</div>
             </div>
@@ -1304,7 +1308,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
                 <div>Transport morski: {n2(calc.displayOceanUSD)}</div>
                 <div>Ubezpieczenie: {n2(calc.insurance)}</div>
 
-                <div className="pt-2"></div>
+                <div className="pt-2" />
 
                 <div>Opłata brokerska: {n2(calc.extraBreak.brokerFee)}</div>
                 <div>Bezpieczny załadunek: {n2(calc.extraBreak.safeLoading)}</div>
