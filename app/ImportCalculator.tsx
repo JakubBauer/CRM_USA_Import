@@ -823,7 +823,7 @@ function splitExtraUSD(extraUSD: number) {
 }
 
 // ================= DEFAULT EXPORT (CRM importuje TO) =================
-export default function ImportCalculator({ onLogout }: { onLogout?: () => void }) {
+function MainApp(props: { onLogout: () => void }) {
   return <MainApp onLogout={onLogout ?? (() => {})} />;
 }
 
