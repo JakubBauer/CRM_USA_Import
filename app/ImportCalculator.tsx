@@ -1,7 +1,8 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-export default function ImportCalculator({ onLogout }: { onLogout: () => void }) {
-  return <MainApp onLogout={onLogout} />;
+
+export default function ImportCalculatorPage({ onLogout }: { onLogout?: () => void }) {
+  return <MainApp onLogout={onLogout ?? (() => {})} />;
 }
 
 // ================= PORTY USA =================
