@@ -1008,14 +1008,35 @@ export default function CRMClient() {
 
               {editing && (
   <>
-    <button
-      type="button"
-      onClick={() => setAttachmentsLeadId(editing.id)}
-      className="rounded-xl bg-slate-200 px-4 py-2.5 text-sm font-semibold hover:bg-slate-300"
-    >
-      Pliki
-    </button>
+    {/* ===== Upload pliku do leada ===== */}
+    <div className="mt-4 rounded-xl border border-slate-200 p-4">
+      <div className="text-sm font-semibold mb-2">Załącznik</div>
 
+      <input
+        type="file"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file || !editingId) return;
+
+          const res = await fetch(
+            `/api/blob/lead-upload?leadId=${encodeURIComponent(editingId)}&filename=${encodeURIComponent(file.name)}`,
+            {
+              method: "POST",
+              body: file,
+            }
+          );
+
+          if (!res.ok) {
+            alert("Błąd uploadu");
+            return;
+          }
+
+          alert("Plik wgrany ✅");
+        }}
+      />
+    </div>
+  </>
+)}
     <button
       className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
       onClick={() => deleteLead(editing.id)}
