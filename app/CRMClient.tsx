@@ -791,7 +791,7 @@ export default function CRMClient() {
   }
 
   return (
-    <Shell>
+    <div>
       <Topbar
         title="CRM"
         subtitle={
@@ -1310,6 +1310,7 @@ export default function CRMClient() {
           </div>
         </div>
       </div>
-    </Shell>
+    </div>
+  
   );
 }
