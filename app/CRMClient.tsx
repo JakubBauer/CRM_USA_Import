@@ -4,8 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import ImportCalculatorPage from "./ImportCalculator";
 import { LeadAttachments } from "./components/LeadAttachments";
 
-
-// --- UI helpers (MUSZĄ być poza CRMClient, inaczej parser/closure robi burdel) ---
+// ========================= UI helpers =========================
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
     <div className="mx-auto max-w-7xl px-4 py-5">{children}</div>
@@ -85,10 +84,7 @@ const Label = ({ children }: { children: React.ReactNode }) => (
   <div className="mb-1 text-xs font-medium text-slate-600">{children}</div>
 );
 
-const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input(
-  props,
-  ref
-) {
+const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input(props, ref) {
   const { className = "", ...rest } = props;
   return (
     <input
@@ -119,23 +115,24 @@ const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HT
   );
 });
 
-const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(
-  function Textarea(props, ref) {
-    const { className = "", ...rest } = props;
-    return (
-      <textarea
-        ref={ref}
-        {...rest}
-        className={
-          "w-full min-h-[100px] resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 " +
-          className
-        }
-      />
-    );
-  }
-);
+const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea(
+  props,
+  ref
+) {
+  const { className = "", ...rest } = props;
+  return (
+    <textarea
+      ref={ref}
+      {...rest}
+      className={
+        "w-full min-h-[100px] resize-y rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-200 " +
+        className
+      }
+    />
+  );
+});
 
-// --- Types / helpers ---
+// ========================= Types / helpers =========================
 type Role = "ADMIN" | "SALES";
 type UserRow = { id: string; name: string; role: Role; phone: string };
 type User = { id: string; name: string; role: Role };
@@ -302,12 +299,12 @@ function mapFromDb(x: any): Lead {
   };
 }
 
+// ========================= Login =========================
 function Login({ onLogin }: { onLogin: (u: User) => void }) {
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [attachmentsLeadId, setAttachmentsLeadId] = useState<string | null>(null);
 
   async function handleLogin() {
     setErr(null);
@@ -319,7 +316,6 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
         body: JSON.stringify({ phone: phone.trim(), password }),
       });
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok) {
         setErr(data?.error || "Błąd logowania");
         return;
@@ -346,12 +342,7 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
 
           <div>
             <Label>Hasło</Label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••"
-            />
+            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••" />
           </div>
 
           <button
@@ -370,6 +361,7 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
   );
 }
 
+// ========================= Main =========================
 export default function CRMClient() {
   const [view, setView] = useState<"crm" | "calc">("crm");
   const [user, setUser] = useState<User | null>(null);
@@ -389,6 +381,10 @@ export default function CRMClient() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const editing = useMemo(() => leads.find((l) => l.id === editingId) ?? null, [leads, editingId]);
+
+  // panel załączników
+  const [attachmentsLeadId, setAttachmentsLeadId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -509,6 +505,7 @@ export default function CRMClient() {
   function resetForm() {
     if (!user) return;
     setEditingId(null);
+    setAttachmentsLeadId(null);
     setForm({
       name: "",
       phone: "",
@@ -701,6 +698,28 @@ export default function CRMClient() {
     }
   }
 
+  async function uploadLeadFile(file: File) {
+    if (!editingId) return;
+    setUploading(true);
+    try {
+      const res = await fetch(
+        `/api/blob/lead-upload?leadId=${encodeURIComponent(editingId)}&filename=${encodeURIComponent(file.name)}`,
+        { method: "POST", body: file }
+      );
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        console.error(txt);
+        alert("Błąd uploadu");
+        return;
+      }
+      alert("Plik wgrany ✅");
+      // otwórz panel załączników po uploadzie
+      setAttachmentsLeadId(editingId);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let list = [...leads];
@@ -760,14 +779,12 @@ export default function CRMClient() {
     return { total: leads.length, byStatus, avgBudget };
   }, [leads]);
 
-  // --- RENDER ---
-  if (!user) {
-    return <Login onLogin={(u) => setUser(u)} />;
-  }
+  // ========================= RENDER =========================
+  if (!user) return <Login onLogin={(u) => setUser(u)} />;
 
   if (view === "calc") {
     return (
-      <div>
+      <Shell>
         <Topbar
           title="Kalkulator importu"
           subtitle={
@@ -786,12 +803,12 @@ export default function CRMClient() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(0,0,0,.06)]">
           <ImportCalculatorPage />
         </div>
-      </div>
+      </Shell>
     );
   }
 
   return (
-    <div>
+    <Shell>
       <Topbar
         title="CRM"
         subtitle={
@@ -838,11 +855,7 @@ export default function CRMClient() {
           <div className="border-t border-slate-200 p-4 space-y-3">
             <div>
               <Label>Imię / Nazwa</Label>
-              <Input
-                ref={nameRef}
-                value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              />
+              <Input ref={nameRef} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
             </div>
 
             <div>
@@ -871,7 +884,6 @@ export default function CRMClient() {
               </div>
             </div>
 
-            {/* ADMIN assign */}
             {user.role === "ADMIN" && (
               <div>
                 <Label>Opiekun (przypisz do)</Label>
@@ -901,9 +913,7 @@ export default function CRMClient() {
                 <Label>Rocznik</Label>
                 <Input
                   value={form.yearText}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, yearText: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) }))
-                  }
+                  onChange={(e) => setForm((p) => ({ ...p, yearText: e.target.value.replace(/[^0-9]/g, "").slice(0, 4) }))}
                   inputMode="numeric"
                   placeholder="2019"
                 />
@@ -947,11 +957,7 @@ export default function CRMClient() {
 
                   {user.role === "ADMIN" && isClosed && (
                     <label className="flex items-center gap-2 text-xs text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={adminUnlockClosed}
-                        onChange={(e) => setAdminUnlockClosed(e.target.checked)}
-                      />
+                      <input type="checkbox" checked={adminUnlockClosed} onChange={(e) => setAdminUnlockClosed(e.target.checked)} />
                       Odblokuj edycję
                     </label>
                   )}
@@ -996,7 +1002,8 @@ export default function CRMClient() {
               <Textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} />
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-2">
+            {/* Actions */}
+            <div className="flex flex-wrap items-center gap-2 pt-2">
               <button
                 className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
                 onClick={upsertLead}
@@ -1007,68 +1014,69 @@ export default function CRMClient() {
               </button>
 
               {editing && (
-  <>
-    {/* ===== Upload pliku do leada ===== */}
-    <div className="mt-4 rounded-xl border border-slate-200 p-4">
-      <div className="text-sm font-semibold mb-2">Załącznik</div>
+                <>
+                  <button
+                    type="button"
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 disabled:opacity-60"
+                    onClick={() => setAttachmentsLeadId(editing.id)}
+                    disabled={saving}
+                  >
+                    Pliki
+                  </button>
 
-      <input
-        type="file"
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file || !editingId) return;
+                  <label className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 cursor-pointer disabled:opacity-60">
+                    {uploading ? "Wgrywam..." : "Dodaj plik"}
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.currentTarget.value = "";
+                        if (!file) return;
+                        void uploadLeadFile(file);
+                      }}
+                      disabled={uploading || saving}
+                    />
+                  </label>
 
-          const res = await fetch(
-            `/api/blob/lead-upload?leadId=${encodeURIComponent(editingId)}&filename=${encodeURIComponent(file.name)}`,
-            {
-              method: "POST",
-              body: file,
-            }
-          );
-
-          if (!res.ok) {
-            alert("Błąd uploadu");
-            return;
-          }
-
-          alert("Plik wgrany ✅");
-        }}
-      />
-    </div>
-  </>
-)}
-    <button
-      className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
-      onClick={() => deleteLead(editing.id)}
-      disabled={saving}
-      type="button"
-    >
-      Usuń
-    </button>
-  </>
-)}
-{attachmentsLeadId && (
-  <div className="mt-6 rounded-2xl border bg-white p-4">
-    <div className="flex items-center justify-between">
-      <div className="font-semibold">Załączniki</div>
-      <button
-        type="button"
-        onClick={() => setAttachmentsLeadId(null)}
-        className="rounded-lg border px-3 py-1 text-sm hover:bg-slate-50"
-      >
-        Zamknij
-      </button>
-    </div>
-
-    <div className="mt-4">
-      <LeadAttachments leadId={attachmentsLeadId} />
-    </div>
-  </div>
-)}
+                  <button
+                    className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                    onClick={() => deleteLead(editing.id)}
+                    disabled={saving}
+                    type="button"
+                  >
+                    Usuń
+                  </button>
+                </>
+              )}
             </div>
 
+            {/* Attachments panel */}
+            {attachmentsLeadId && (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold">Załączniki</div>
+                  <button
+                    type="button"
+                    onClick={() => setAttachmentsLeadId(null)}
+                    className="rounded-lg border border-slate-200 px-3 py-1 text-sm hover:bg-slate-50"
+                  >
+                    Zamknij
+                  </button>
+                </div>
+
+                <div className="mt-4">
+                  <LeadAttachments leadId={attachmentsLeadId} />
+                </div>
+              </div>
+            )}
+
             <div className="pt-1 text-xs text-slate-500">
-              {loading ? "Ładowanie…" : user.role === "ADMIN" ? "ADMIN: widzisz wszystko." : "SALES: widzisz tylko swoje leady (backend)."}
+              {loading
+                ? "Ładowanie…"
+                : user.role === "ADMIN"
+                ? "ADMIN: widzisz wszystko."
+                : "SALES: widzisz tylko swoje leady (backend)."}
             </div>
           </div>
         </div>
@@ -1077,12 +1085,7 @@ export default function CRMClient() {
         <div className="rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(0,0,0,.06)]">
           <div className="p-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Input
-                className="flex-1 min-w-[220px]"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Szukaj…"
-              />
+              <Input className="flex-1 min-w-[220px]" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Szukaj…" />
 
               <Select className="w-[220px]" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
                 <option value="Wszystkie">Wszystkie etapy</option>
@@ -1169,7 +1172,10 @@ export default function CRMClient() {
                     filtered.map((l) => (
                       <tr
                         key={l.id}
-                        onClick={() => setEditingId(l.id)}
+                        onClick={() => {
+                          setEditingId(l.id);
+                          setAttachmentsLeadId(null);
+                        }}
                         className={`cursor-pointer ${editingId === l.id ? "bg-blue-50" : "hover:bg-slate-50"}`}
                       >
                         <td className="border-b border-slate-100 px-4 py-3 align-top">
@@ -1178,19 +1184,13 @@ export default function CRMClient() {
                             Tel: {l.phone || "—"} • utw.: {formatDate(l.createdAt)}
                           </div>
                           {l.notes ? (
-                            <div className="mt-2 text-sm text-slate-700">
-                              {l.notes.length > 90 ? l.notes.slice(0, 90) + "…" : l.notes}
-                            </div>
+                            <div className="mt-2 text-sm text-slate-700">{l.notes.length > 90 ? l.notes.slice(0, 90) + "…" : l.notes}</div>
                           ) : null}
                         </td>
 
                         <td className="border-b border-slate-100 px-4 py-3 align-top">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span
-                              className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeBg(
-                                l.status
-                              )}`}
-                            >
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${badgeBg(l.status)}`}>
                               {l.status}
                             </span>
                             <Select
@@ -1209,9 +1209,7 @@ export default function CRMClient() {
                         </td>
 
                         <td className="border-b border-slate-100 px-4 py-3 align-top">
-                          <div className="font-semibold text-slate-900">
-                            {(l.model || "—") + (l.year ? ` • ${l.year}` : "")}
-                          </div>
+                          <div className="font-semibold text-slate-900">{(l.model || "—") + (l.year ? ` • ${l.year}` : "")}</div>
                           {l.auctionUrl ? (
                             <a
                               href={l.auctionUrl}
@@ -1225,9 +1223,7 @@ export default function CRMClient() {
                           ) : (
                             <div className="text-xs text-slate-500">—</div>
                           )}
-                          {l.status === "Kupiony" && l.vin ? (
-                            <div className="mt-1 text-xs text-slate-500">VIN: {l.vin}</div>
-                          ) : null}
+                          {l.status === "Kupiony" && l.vin ? <div className="mt-1 text-xs text-slate-500">VIN: {l.vin}</div> : null}
                         </td>
 
                         <td className="border-b border-slate-100 px-4 py-3 align-top">
@@ -1310,7 +1306,6 @@ export default function CRMClient() {
           </div>
         </div>
       </div>
-    </div>
-  
+    </Shell>
   );
 }
