@@ -767,7 +767,7 @@ export default function CRMClient() {
 
   if (view === "calc") {
     return (
-      <Shell>
+      <div>
         <Topbar
           title="Kalkulator importu"
           subtitle={
@@ -786,7 +786,7 @@ export default function CRMClient() {
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(0,0,0,.06)]">
           <ImportCalculatorPage />
         </div>
-      </Shell>
+      </div>
     );
   }
 
