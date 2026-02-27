@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ImportCalculatorPage from "./ImportCalculator";
+import { LeadAttachments } from "./components/LeadAttachments";
+
 
 // --- UI helpers (MUSZĄ być poza CRMClient, inaczej parser/closure robi burdel) ---
 const Shell = ({ children }: { children: React.ReactNode }) => (
@@ -305,6 +307,7 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [attachmentsLeadId, setAttachmentsLeadId] = useState<string | null>(null);
 
   async function handleLogin() {
     setErr(null);
@@ -1004,15 +1007,43 @@ export default function CRMClient() {
               </button>
 
               {editing && (
-                <button
-                  className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                  onClick={() => deleteLead(editing.id)}
-                  disabled={saving}
-                  type="button"
-                >
-                  Usuń
-                </button>
-              )}
+  <>
+    <button
+      type="button"
+      onClick={() => setAttachmentsLeadId(editing.id)}
+      className="rounded-xl bg-slate-200 px-4 py-2.5 text-sm font-semibold hover:bg-slate-300"
+    >
+      Pliki
+    </button>
+
+    <button
+      className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+      onClick={() => deleteLead(editing.id)}
+      disabled={saving}
+      type="button"
+    >
+      Usuń
+    </button>
+  </>
+)}
+{attachmentsLeadId && (
+  <div className="mt-6 rounded-2xl border bg-white p-4">
+    <div className="flex items-center justify-between">
+      <div className="font-semibold">Załączniki</div>
+      <button
+        type="button"
+        onClick={() => setAttachmentsLeadId(null)}
+        className="rounded-lg border px-3 py-1 text-sm hover:bg-slate-50"
+      >
+        Zamknij
+      </button>
+    </div>
+
+    <div className="mt-4">
+      <LeadAttachments leadId={attachmentsLeadId} />
+    </div>
+  </div>
+)}
             </div>
 
             <div className="pt-1 text-xs text-slate-500">
