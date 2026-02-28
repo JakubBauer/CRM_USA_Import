@@ -7,7 +7,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY! // UWAGA: tylko na serwerze, nie w kliencie
 );
 
-async function requireUser() {
+async function requireUser(_request: Request) {
   // TODO: Twoje sprawdzanie sesji (jak w kroku 2)
   return { id: "ok" };
 }
@@ -49,10 +49,10 @@ export async function POST(
 }
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: { id: string } }
 ) {
-    const user = await requireUser(request);
+  const user = await requireUser(request);
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const leadId = params.id;
