@@ -17,9 +17,14 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   const filename = searchParams.get("filename") || "file";
   const contentType = req.headers.get("content-type") || undefined;
 
+  // ✅ FIX: req.body może być null
+  if (!req.body) {
+    return NextResponse.json({ error: "Empty body" }, { status: 400 });
+  }
+
   // zapis do Blob
   const blob = await put(`leads/${leadId}/${Date.now()}-${filename}`, req.body, {
-    access: "private", // polecam private
+    access: "private",
     contentType,
   });
 
