@@ -4,47 +4,31 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 
-async function requireUser(request: Request): Promise<{ id: string } | null> {
-  const res = await fetch(new URL("/api/whoami", request.url), {
-    method: "GET",
-    headers: { cookie: request.headers.get("cookie") ?? "" },
-    cache: "no-store",
-  });
+export async function POST(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  const leadId = params.id;
 
-  if (!res.ok) return null;
+  const { searchParams } = new URL(req.url);
+  const filename = searchParams.get("filename") ?? "file";
 
-  const data = await res.json().catch(() => null);
-  const userId = data?.user?.id ?? data?.id ?? null;
-  return userId ? { id: String(userId) } : null;
-}
+  const contentType = req.headers.get("content-type") ?? undefined;
 
-export async function POST(request: Request) {
-  const user = await requireUser(request);
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const filename = searchParams.get("filename");
-  const leadId = searchParams.get("leadId");
-
-  if (!filename || !leadId) {
-    return NextResponse.json(
-      { error: "Missing filename or leadId" },
-      { status: 400 }
-    );
-  }
-
-  // ✅ FIX: request.body może być null
-  if (!request.body) {
+  // ✅ FIX: req.body może być null
+  if (!req.body) {
     return NextResponse.json({ error: "Empty body" }, { status: 400 });
   }
 
-  const blob = await put(`leads/${leadId}/${filename}`, request.body, {
-    access: "private",
-    addRandomSuffix: true,
-    contentType: request.headers.get("content-type") ?? undefined,
-  });
+  const blob = await put(
+    `leads/${leadId}/${Date.now()}-${filename}`,
+    req.body,
+    {
+      access: "private",
+      contentType,
+      addRandomSuffix: false,
+    }
+  );
 
   return NextResponse.json(blob);
 }
