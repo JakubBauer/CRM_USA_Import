@@ -35,6 +35,11 @@ export async function POST(request: Request) {
     );
   }
 
+  // ✅ FIX: request.body może być null
+  if (!request.body) {
+    return NextResponse.json({ error: "Empty body" }, { status: 400 });
+  }
+
   const blob = await put(`leads/${leadId}/${filename}`, request.body, {
     access: "private",
     addRandomSuffix: true,
