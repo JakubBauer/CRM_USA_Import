@@ -32,14 +32,12 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
   const { error } = await supabase.from("lead_files").insert({
     lead_id: leadId,
     filename,
-    content_type: contentType,
-    size: blob.size ?? null,
+    content_type: contentType ?? null,
     blob_url: blob.url,
   });
-
+  
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
+  
   return NextResponse.json(blob);
-}
