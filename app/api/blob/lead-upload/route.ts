@@ -1,8 +1,12 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
 
-// (zostawiamy Twoją autoryzację jak była)
-async function requireUser(request: Request) {
+export async function POST(request: Request) {
+  // ...
+
   const res = await fetch(new URL("/api/whoami", request.url), {
     method: "GET",
     headers: {
