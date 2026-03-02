@@ -381,11 +381,11 @@ export default function CRMClient() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const editing = useMemo(() => leads.find((l) => l.id === editingId) ?? null, [leads, editingId]);
-
+  
   // panel załączników
   const [attachmentsLeadId, setAttachmentsLeadId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     phone: "",
