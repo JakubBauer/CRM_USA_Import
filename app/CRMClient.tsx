@@ -320,6 +320,7 @@ function Login({ onLogin }: { onLogin: (u: User) => void }) {
         setErr(data?.error || "Błąd logowania");
         return;
       }
+      // zakładamy: API zwraca { id, name, role } i ustawia cookie
       onLogin(data as User);
     } finally {
       setLoading(false);
@@ -381,11 +382,12 @@ export default function CRMClient() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const editing = useMemo(() => leads.find((l) => l.id === editingId) ?? null, [leads, editingId]);
-  
-  // panel załączników
+
   const [attachmentsLeadId, setAttachmentsLeadId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
+
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -416,15 +418,33 @@ export default function CRMClient() {
   const isClosed = form.status === "Wydane";
   const canEditChecklist = !isClosed || (user?.role === "ADMIN" && adminUnlockClosed);
 
-  // whoami
+  // 1) Odtwórz sesję po odświeżeniu strony
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch("/api/whoami", { cache: "no-store" });
-        if (!res.ok) return;
-        const me = await res.json();
-        if (me?.id) setUser(me as User);
-      } catch {}
+        if (!res.ok) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        const data = await res.json().catch(() => null);
+
+        // obsłuż dwie możliwe struktury:
+        // a) { id, name, role }
+        // b) { user: { id, name, role } }
+        const u = data?.user?.id ? data.user : data;
+
+        if (u?.id && u?.role) {
+          setUser(u as User);
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -439,26 +459,28 @@ export default function CRMClient() {
       await fetch("/api/logout", { method: "POST" });
     } catch {}
     setUser(null);
+    setLeads([]);
+    setEditingId(null);
+    setAttachmentsLeadId(null);
   }
 
   async function reload() {
+    if (!user) return;
+
     try {
       setLoading(true);
       setError(null);
-  
-      const s = await getSession();
-      if (!s) {
-        setLeads([]);
-        setLoading(false);
-        return;
-      }
-  
-      const qs = new URLSearchParams({ userId: s.userId, role: s.role });
+
+      const qs = new URLSearchParams({
+        userId: user.id,
+        role: user.role,
+      });
+
       const res = await fetch(`/api/leads?${qs.toString()}`, { cache: "no-store" });
-  
       const data = await res.json().catch(() => null);
+
       if (!res.ok) throw new Error(data?.error ?? "Błąd pobierania leadów");
-  
+
       const rows = Array.isArray(data?.leads) ? data.leads : [];
       setLeads(rows.map(mapFromDb));
     } catch (e: any) {
@@ -469,9 +491,10 @@ export default function CRMClient() {
     }
   }
 
+  // 2) po zalogowaniu / odtworzeniu user → pobierz leady
   useEffect(() => {
     if (!user) return;
-    reload();
+    void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.role]);
 
@@ -722,7 +745,6 @@ export default function CRMClient() {
         return;
       }
       alert("Plik wgrany ✅");
-      // otwórz panel załączników po uploadzie
       setAttachmentsLeadId(editingId);
     } finally {
       setUploading(false);
@@ -804,8 +826,8 @@ export default function CRMClient() {
           }
           view={view}
           setView={setView}
-          reload={reload}
-          logout={logout}
+          reload={() => void reload()}
+          logout={() => void logout()}
           loading={loading}
           saving={saving}
         />
@@ -828,11 +850,17 @@ export default function CRMClient() {
         }
         view={view}
         setView={setView}
-        reload={reload}
-        logout={logout}
+        reload={() => void reload()}
+        logout={() => void logout()}
         loading={loading}
         saving={saving}
       />
+
+      {error && (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-700">
@@ -1015,7 +1043,7 @@ export default function CRMClient() {
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <button
                 className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
-                onClick={upsertLead}
+                onClick={() => void upsertLead()}
                 disabled={saving}
                 type="button"
               >
@@ -1050,7 +1078,7 @@ export default function CRMClient() {
 
                   <button
                     className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                    onClick={() => deleteLead(editing.id)}
+                    onClick={() => void deleteLead(editing.id)}
                     disabled={saving}
                     type="button"
                   >
@@ -1206,7 +1234,7 @@ export default function CRMClient() {
                               className="w-[170px]"
                               value={l.status}
                               onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => quickStatus(l.id, e.target.value as LeadStatus)}
+                              onChange={(e) => void quickStatus(l.id, e.target.value as LeadStatus)}
                             >
                               {STATUSES.map((s) => (
                                 <option key={s} value={s}>
@@ -1249,7 +1277,7 @@ export default function CRMClient() {
                               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                touchContact(l.id);
+                                void touchContact(l.id);
                               }}
                               type="button"
                             >
@@ -1260,7 +1288,7 @@ export default function CRMClient() {
                               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setFollowupInDays(l.id, 1);
+                                void setFollowupInDays(l.id, 1);
                               }}
                               type="button"
                             >
@@ -1271,7 +1299,7 @@ export default function CRMClient() {
                               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setFollowupInDays(l.id, 3);
+                                void setFollowupInDays(l.id, 3);
                               }}
                               type="button"
                             >
@@ -1282,7 +1310,7 @@ export default function CRMClient() {
                               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setFollowupInDays(l.id, 7);
+                                void setFollowupInDays(l.id, 7);
                               }}
                               type="button"
                             >
@@ -1293,7 +1321,7 @@ export default function CRMClient() {
                               className="rounded-xl bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                deleteLead(l.id);
+                                void deleteLead(l.id);
                               }}
                               type="button"
                             >
