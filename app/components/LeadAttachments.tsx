@@ -138,13 +138,15 @@ export function LeadAttachments({ leadId }: { leadId: string }) {
               </div>
 
               <a
-                className="text-sm font-semibold underline whitespace-nowrap"
-                href={f.blob_url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Otwórz
-              </a>
+  className="text-sm font-semibold underline whitespace-nowrap"
+  href={`/api/file?pathname=${encodeURIComponent(
+    new URL(f.blob_url).pathname.slice(1)
+  )}`}
+  target="_blank"
+  rel="noreferrer"
+>
+  Otwórz
+</a>
             </li>
           ))}
         </ul>
