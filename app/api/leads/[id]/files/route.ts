@@ -1,20 +1,56 @@
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
+import { put } from "@vercel/blob";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY! // tylko na backend!
 );
 
-export async function GET(_req: Request, ctx: { params: { id: string } }) {
-  const leadId = ctx.params.id;
+export async function POST(req: Request, ctx: { params: { id: string } }) {
+  try {
+    const leadId = ctx.params.id;
 
-  const { data, error } = await supabase
-    .from("lead_files")
-    .select("*")
-    .eq("lead_id", leadId)
-    .order("created_at", { ascending: false });
+    const { searchParams } = new URL(req.url);
+    const filename = searchParams.get("filename") || "file";
+    const contentType = req.headers.get("content-type") ?? null;
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ files: data ?? [] });
+    if (!req.body) {
+      return NextResponse.json({ error: "Empty body" }, { status: 400 });
+    }
+
+    // zapis do Blob
+    const blob = await put(
+      `leads/${leadId}/${Date.now()}-${filename}`,
+      req.body,
+      {
+        access: "private",
+        contentType: contentType ?? undefined,
+      }
+    );
+
+    // metadane do supabase
+    const { error } = await supabase.from("lead_files").insert({
+      lead_id: leadId,
+      filename,
+      content_type: contentType,
+      blob_url: blob.url,
+    });
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(blob);
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message ?? "Upload failed" },
+      { status: 500 }
+    );
+  }
 }
+
+
