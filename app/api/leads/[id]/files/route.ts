@@ -28,6 +28,7 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
     });
 
     const { error } = await supabase.from("lead_files").insert({
+      id: crypto.randomUUID(),
       lead_id: leadId,
       filename,
       content_type: contentType,
