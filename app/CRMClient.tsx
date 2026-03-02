@@ -442,19 +442,28 @@ export default function CRMClient() {
   }
 
   async function reload() {
-    if (!user) return;
-    setLoading(true);
     try {
-      const res = await fetch(
-        `/api/leads?userId=${encodeURIComponent(user.id)}&role=${encodeURIComponent(user.role)}`,
-        { cache: "no-store" }
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.error || "Błąd pobierania");
-      setLeads(Array.isArray(data) ? data.map(mapFromDb) : []);
+      setLoading(true);
+      setError(null);
+  
+      const s = await getSession();
+      if (!s) {
+        setLeads([]);
+        setLoading(false);
+        return;
+      }
+  
+      const qs = new URLSearchParams({ userId: s.userId, role: s.role });
+      const res = await fetch(`/api/leads?${qs.toString()}`, { cache: "no-store" });
+  
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Błąd pobierania leadów");
+  
+      const rows = Array.isArray(data?.leads) ? data.leads : [];
+      setLeads(rows.map(mapFromDb));
     } catch (e: any) {
-      console.error(e);
-      alert(e?.message || "Błąd pobierania");
+      setError(e?.message ?? "Błąd pobierania");
+      setLeads([]);
     } finally {
       setLoading(false);
     }
