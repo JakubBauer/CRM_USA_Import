@@ -7,7 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // tylko na backend!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(req: Request, ctx: { params: { id: string } }) {
@@ -22,17 +22,11 @@ export async function POST(req: Request, ctx: { params: { id: string } }) {
       return NextResponse.json({ error: "Empty body" }, { status: 400 });
     }
 
-    // zapis do Blob
-    const blob = await put(
-      `leads/${leadId}/${Date.now()}-${filename}`,
-      req.body,
-      {
-        access: "private",
-        contentType: contentType ?? undefined,
-      }
-    );
+    const blob = await put(`leads/${leadId}/${Date.now()}-${filename}`, req.body, {
+      access: "private",
+      contentType: contentType ?? undefined,
+    });
 
-    // metadane do supabase
     const { error } = await supabase.from("lead_files").insert({
       lead_id: leadId,
       filename,
