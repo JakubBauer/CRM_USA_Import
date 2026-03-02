@@ -1,88 +1,23 @@
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseServer } from "../../../../../lib/supabaseServer";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function json(data: any, status = 200) {
+  return NextResponse.json(data, { status });
+}
 
-export async function POST(
-  req: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const leadId = params.id;
+// GET /api/leads/:id/files  -> lista plików leada
+export async function GET(_: Request, { params }: { params: { id: string } }) {
+  const leadId = params.id;
 
-    // 🔎 Walidacja UUID
-    if (!leadId || !/^[0-9a-fA-F-]{36}$/.test(leadId)) {
-      return NextResponse.json(
-        { error: "Invalid lead ID" },
-        { status: 400 }
-      );
-    }
+  const { data, error } = await supabaseServer
+    .from("lead_files")
+    .select("id, lead_id, filename, content_type, size, blob_url, created_at")
+    .eq("lead_id", leadId)
+    .order("created_at", { ascending: false });
 
-    const { searchParams } = new URL(req.url);
-    const filename = searchParams.get("filename") || "file";
-    const contentType = req.headers.get("content-type") ?? null;
+  if (error) return json({ error: error.message }, 500);
 
-    if (!req.body) {
-      return NextResponse.json(
-        { error: "Empty body" },
-        { status: 400 }
-      );
-    }
-
-    // 1️⃣ Zapis do Vercel Blob
-    const blob = await put(
-      `leads/${leadId}/${Date.now()}-${filename}`,
-      req.body,
-      {
-        access: "private",
-        contentType: contentType ?? undefined,
-      }
-    );
-
-    console.log("Blob saved:", blob.url);
-
-    // 2️⃣ Zapis metadanych do Supabase
-    const { data, error } = await supabase
-      .from("lead_files")
-      .insert({
-        id: crypto.randomUUID(),
-        lead_id: leadId,
-        filename,
-        content_type: contentType,
-        blob_url: blob.url,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Supabase insert error:", error);
-      return NextResponse.json(
-        { error: error.message },
-        { status: 500 }
-      );
-    }
-
-    console.log("Insert OK:", data);
-
-    return NextResponse.json({
-      success: true,
-      file: data,
-    });
-
-  } catch (e: any) {
-    console.error("UPLOAD ERROR:", e);
-    return NextResponse.json(
-      { error: e?.message ?? "Upload failed" },
-      { status: 500 }
-    );
-  }
+  return json({ files: data ?? [] });
 }
 
 
