@@ -18,41 +18,71 @@ export function LeadAttachments({ leadId }: { leadId: string }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const isValidUUID = (id: string) =>
+    /^[0-9a-fA-F-]{36}$/.test(id);
+
   async function refresh() {
-    setErr(null);
-    const res = await fetch(`/api/leads/${leadId}/files`, { cache: "no-store" });
-    const json = await res.json();
-    if (!res.ok) {
-      setErr(json?.error ?? "Błąd pobierania plików");
-      return;
+    try {
+      setErr(null);
+
+      if (!leadId || !isValidUUID(leadId)) {
+        setFiles([]);
+        return;
+      }
+
+      const res = await fetch(`/api/leads/${leadId}/files`, {
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(json?.error ?? "Błąd pobierania plików");
+      }
+
+      setFiles(json?.files ?? []);
+    } catch (e: any) {
+      setErr(e?.message ?? "Błąd pobierania");
     }
-    setFiles(json.files ?? []);
   }
 
   useEffect(() => {
     if (!leadId) return;
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leadId]);
 
   async function uploadSelected() {
     try {
       setErr(null);
+
       const file = inputRef.current?.files?.[0];
       if (!file) return;
 
+      if (!isValidUUID(leadId)) {
+        throw new Error("Nieprawidłowe ID leada");
+      }
+
       setBusy(true);
 
-      const res = await fetch(`/api/leads/${leadId}/files/upload?filename=${encodeURIComponent(file.name)}`, {
-        method: "POST",
-        body: file,
-        headers: { "content-type": file.type || "application/octet-stream" },
-      });
+      const res = await fetch(
+        `/api/leads/${leadId}/files/upload?filename=${encodeURIComponent(file.name)}`,
+        {
+          method: "POST",
+          body: file,
+          headers: {
+            "content-type": file.type || "application/octet-stream",
+          },
+        }
+      );
 
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "Upload nieudany");
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(json?.error ?? "Upload nieudany");
+      }
 
       if (inputRef.current) inputRef.current.value = "";
+
       await refresh();
     } catch (e: any) {
       setErr(e?.message ?? "Błąd uploadu");
@@ -78,23 +108,35 @@ export function LeadAttachments({ leadId }: { leadId: string }) {
         </div>
       </div>
 
-      {err && <div className="text-sm text-red-600">{err}</div>}
+      {err && (
+        <div className="text-sm text-red-600">{err}</div>
+      )}
 
       {files.length === 0 ? (
-        <div className="text-sm text-gray-500">Brak plików dla tego leada.</div>
+        <div className="text-sm text-gray-500">
+          Brak plików dla tego leada.
+        </div>
       ) : (
         <ul className="space-y-2">
           {files.map((f) => (
-            <li key={f.id} className="flex items-center justify-between gap-3 rounded-xl border p-3">
+            <li
+              key={f.id}
+              className="flex items-center justify-between gap-3 rounded-xl border p-3"
+            >
               <div className="min-w-0">
-                <div className="text-sm font-medium truncate">{f.filename}</div>
+                <div className="text-sm font-medium truncate">
+                  {f.filename}
+                </div>
                 <div className="text-xs text-gray-500">
-                  {f.content_type ?? "plik"} · {f.size ? `${Math.round(f.size / 1024)} KB` : "—"} ·{" "}
+                  {f.content_type ?? "plik"} ·{" "}
+                  {f.size
+                    ? `${Math.round(f.size / 1024)} KB`
+                    : "—"}{" "}
+                  ·{" "}
                   {new Date(f.created_at).toLocaleString("pl-PL")}
                 </div>
               </div>
 
-              {/* na razie link bez podpisywania; przy private będzie wymagało podpisania URL (zrobimy następny krok) */}
               <a
                 className="text-sm font-semibold underline whitespace-nowrap"
                 href={f.blob_url}
