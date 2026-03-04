@@ -765,6 +765,24 @@ async function geocodeZipUS(zip: string) {
   return { lat, lon } as { lat: number; lon: number };
 }
 
+async function getDrivingMilesOSRM(
+  from: { lat: number; lon: number },
+  to: { lat: number; lon: number }
+) {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=false`;
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const meters = data?.routes?.[0]?.distance;
+    if (!meters || !Number.isFinite(meters)) return null;
+    return meters / 1609.344; // meters -> miles
+  } catch {
+    return null;
+  }
+}
+
+
 async function fetchNBPRate(code: string) {
   try {
     const res = await fetch(`https://api.nbp.pl/api/exchangerates/rates/A/${code}/?format=json`);
@@ -852,6 +870,9 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
   const [eurPln, setEurPln] = useState<number | null>(null);
 
   const [zipCoord, setZipCoord] = useState<{ lat: number; lon: number } | null>(null);
+  const [nearestPort, setNearestPort] = useState<PortKey>("NJ");
+  const [routeMiles, setRouteMiles] = useState<number | null>(null);
+
 
   useEffect(() => {
     (async () => {
@@ -879,6 +900,43 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
       window.clearTimeout(t);
     };
   }, [zip]);
+
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      if (!zipCoord) {
+        setNearestPort("NJ");
+        setRouteMiles(null);
+        return;
+      }
+
+      // Najbliższy port wybieramy po “air miles” (haversine), ale koszt liczymy po milach drogowych (OSRM).
+      let bestPort: PortKey = "NJ";
+      let bestAirMiles = Number.POSITIVE_INFINITY;
+
+      for (const k of Object.keys(PORTS) as PortKey[]) {
+        const p = PORTS[k];
+        const air = haversineMiles(zipCoord.lat, zipCoord.lon, p.lat, p.lon);
+        if (air < bestAirMiles) {
+          bestAirMiles = air;
+          bestPort = k;
+        }
+      }
+
+      const p = PORTS[bestPort];
+      const driving = await getDrivingMilesOSRM(zipCoord, { lat: p.lat, lon: p.lon });
+
+      if (!alive) return;
+      setNearestPort(bestPort);
+      setRouteMiles(driving);
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [zipCoord]);
+
 
   const suggestions = useMemo(() => searchYards(yardQuery, auctionHouse, 12), [yardQuery, auctionHouse]);
 
@@ -911,21 +969,10 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
     const priceUSD = parseNum(vehiclePrice);
     const extraUSD = parseNum(extraCosts);
 
-    let bestPort: PortKey = "NJ";
-    let bestMiles = Number.POSITIVE_INFINITY;
+    const port = PORTS[nearestPort];
 
-    if (zipCoord) {
-      for (const k of Object.keys(PORTS) as PortKey[]) {
-        const p = PORTS[k];
-        const miles = haversineMiles(zipCoord.lat, zipCoord.lon, p.lat, p.lon);
-        if (miles < bestMiles) {
-          bestMiles = miles;
-          bestPort = k;
-        }
-      }
-    }
-
-    const port = PORTS[bestPort];
+    const airMiles = zipCoord ? haversineMiles(zipCoord.lat, zipCoord.lon, port.lat, port.lon) : 0;
+    const milesToPort = zipCoord ? (routeMiles ?? airMiles) : 0;
 
     const sizeOceanMult = SIZE_MULTIPLIERS[vehicleSize];
     const sizeInlandMult = INLAND_SIZE_MULTIPLIERS[vehicleSize];
@@ -934,7 +981,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
     const zipKnown = isZipInAnyYard(zip);
     const inlandMinDynamic = zipKnown ? INLAND_MIN : INLAND_MIN_UNKNOWN;
 
-    const baseInland = zipCoord ? bestMiles * INLAND_RATE : inlandMinDynamic;
+    const baseInland = zipCoord ? milesToPort * INLAND_RATE : inlandMinDynamic;
     const inlandPreClamp = Math.max(baseInland, inlandMinDynamic) * sizeInlandMult;
     const inland = Math.min(inlandPreClamp, INLAND_MAX);
 
@@ -1057,6 +1104,8 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
     insuranceEnabled,
     vehicleSize,
     zipCoord,
+    nearestPort,
+    routeMiles,
     usdPln,
     eurPln,
     exciseRate,
