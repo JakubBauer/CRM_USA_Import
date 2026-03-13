@@ -1012,7 +1012,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
       const vatBaseEUR = usdToEur(customsValueUSD, usdPlnSafe, eurPlnSafe) + dutyEUR;
       vatEUR = Math.max(vatBaseEUR * 0.21, 300);
     } else {
-      const baseEUR = usdToEur(priceUSD * 0.6, usdPlnSafe, eurPlnSafe);
+      const baseEUR = usdToEur(priceUSD * 0.55, usdPlnSafe, eurPlnSafe);
       dutyEUR = Math.max(baseEUR * 0.1, 300);
       vatEUR = Math.max((baseEUR + dutyEUR) * 0.21, 300);
     }
